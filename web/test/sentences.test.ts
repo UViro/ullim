@@ -146,17 +146,17 @@ describe('SentenceGenerator (자동 생성 문장)', () => {
 })
 
 // iOS VoicePracticeTests/PracticeScriptTests.swift를 옮겼다 (같은 JSON 파일을 읽는다).
-describe('대본 260편', () => {
+describe('대본 500편', () => {
   const genderedWords = [
     '엄마', '아빠', '어머니', '아버지', '언니', '오빠', '누나', '고모', '삼촌', '할머니', '할아버지',
     '아저씨', '아주머니', '아줌마', '남편', '아내', '남자', '여자', '그녀', '소년', '소녀', '신랑', '신부',
   ]
 
-  it('260편(2026-10-31에 60편 더함), 번호·제목·본문이 겹치지 않는다', () => {
-    expect(PRACTICE_SCRIPTS).toHaveLength(260)
-    expect(new Set(PRACTICE_SCRIPTS.map((s) => s.id)).size).toBe(260)
-    expect(new Set(PRACTICE_SCRIPTS.map((s) => s.title)).size).toBe(260)
-    expect(new Set(PRACTICE_SCRIPTS.map((s) => s.text)).size).toBe(260)
+  it('500편(2026-10-31에 60편, 2026-11-15에 240편 더함), 번호·제목·본문이 겹치지 않는다', () => {
+    expect(PRACTICE_SCRIPTS).toHaveLength(500)
+    expect(new Set(PRACTICE_SCRIPTS.map((s) => s.id)).size).toBe(500)
+    expect(new Set(PRACTICE_SCRIPTS.map((s) => s.title)).size).toBe(500)
+    expect(new Set(PRACTICE_SCRIPTS.map((s) => s.text)).size).toBe(500)
   })
 
   it('예상 낭독 시간이 10~60초 안이고, 성별이 드러나는 말을 쓰지 않는다', () => {
@@ -177,11 +177,11 @@ describe('대본 260편', () => {
       '대화문', '독백', '수필', '감성 내레이션', '소설', '산문시', '비문학', '음색 교정',
       '발표', '면접 답변', '전화·안내', '뉴스·일기예보', '동화 낭독',
     ])
-    expect(filterScripts(ANY_CATEGORY, 'any')).toHaveLength(260)
+    expect(filterScripts(ANY_CATEGORY, 'any')).toHaveLength(500)
     const shortTalks = filterScripts('대화문', 'short')
     expect(shortTalks.every((s) => s.category === '대화문' && estimatedSeconds(s) <= 20)).toBe(true)
     const lengths = (['short', 'medium', 'long'] as const).map((l) => filterScripts(ANY_CATEGORY, l).length)
-    expect(lengths.reduce((a, b) => a + b, 0)).toBe(260) // 길이 구간이 겹치거나 빠지지 않는다
+    expect(lengths.reduce((a, b) => a + b, 0)).toBe(500) // 길이 구간이 겹치거나 빠지지 않는다
   })
 
   it('섞인 순서: 대본마다 한 번씩, 같은 시드면 같은 순서, 열 때마다 첫 대본이 달라진다 (iOS ScriptOrder와 같은 확인)', () => {
