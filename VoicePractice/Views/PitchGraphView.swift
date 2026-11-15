@@ -235,10 +235,7 @@ struct PitchGraphView: View {
     private func currentPitchLabel(_ frequency: Double?) -> some View {
         VStack(spacing: 2) {
             HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text(frequency.map { "\(Int($0.rounded()))" } ?? "–")
-                    .font(.system(size: 56, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(isInTarget(frequency) ? inRangeColor : .primary)
+                pitchNumber(frequency, size: 56)
                 Text("Hz")
                     .font(.title3)
                     .foregroundStyle(.secondary)
@@ -251,13 +248,24 @@ struct PitchGraphView: View {
         .accessibilityElement(children: .combine)
     }
 
+    /// 지금 높이 숫자. 세 자리 숫자 폭을 미리 잡아 둔다 (분석 범위 70~400 Hz):
+    /// ‘–’·두 자리·세 자리를 오가도 ‘Hz’와 옆 글이 좌우로 움직이지 않게 (2026-11-15, 웹 `LivePanel`과 같은 까닭)
+    private func pitchNumber(_ frequency: Double?, size: CGFloat) -> some View {
+        ZStack(alignment: .trailing) {
+            Text("000")
+                .hidden()
+                .accessibilityHidden(true)
+            Text(frequency.map { "\(Int($0.rounded()))" } ?? "–")
+                .foregroundStyle(isInTarget(frequency) ? inRangeColor : .primary)
+        }
+        .font(.system(size: size, weight: .semibold, design: .rounded))
+        .monospacedDigit()
+    }
+
     /// 읽기 모드의 한 줄: "152 Hz · 현재 목소리 높이 · 목표 범위 안"
     private func compactPitchLabel(_ frequency: Double?) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Text(frequency.map { "\(Int($0.rounded()))" } ?? "–")
-                .font(.system(size: 28, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(isInTarget(frequency) ? inRangeColor : .primary)
+            pitchNumber(frequency, size: 28)
             Text("Hz")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)

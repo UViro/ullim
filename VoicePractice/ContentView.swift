@@ -28,6 +28,8 @@ struct ContentView: View {
     @State private var fileSaveFailed = false
     @State private var isMeasuringBaseline = false
     @State private var tab = AppTab.pitch
+    /// 녹음·재기를 시작할 때 찍어 둔 지난 녹음 카드. 녹음·재기가 끝나면 nil
+    @State private var pastTakeSnapshot: PastTakeSnapshot?
 
     private enum AppTab: Hashable {
         case pitch
@@ -40,6 +42,21 @@ struct ContentView: View {
         case recording
         /// 내 모음 지도에 모음 하나로 재기
         case vowel(KoreanVowel)
+    }
+
+    /// 새로 녹음하는 동안 흐리게 남겨 둘 지난 녹음 카드의 내용 (2026-11-15).
+    /// 녹음 중에는 `audio.timeline`이 점이 들어올 때마다 바뀌어서, 카드가 그것을 읽으면 화면 전체가 초당 수십 번 다시 계산된다.
+    /// 그래서 녹음을 시작할 때 한 번 찍어 두고 녹음하는 동안에는 이것만 보여 준다.
+    private struct PastTake {
+        let summary: PitchSummary
+        let isSaved: Bool
+        let phraseEndings: PhraseEndingAnalysis?
+        let takeStart: TimeInterval
+    }
+
+    /// 찍어 둔 것. `take`가 nil이면 지난 녹음이 없었다 (첫 녹음)
+    private struct PastTakeSnapshot {
+        let take: PastTake?
     }
 
     /// 공유 창에 넘길 것: 피드백 요청문과 녹음 파일
@@ -92,6 +109,10 @@ struct ContentView: View {
             default:
                 break
             }
+        }
+        // 녹음·재기를 시작할 때 지난 녹음 카드를 찍어 두고, 끝나면 지운다 (탭과 상관없이 늘 따라가게 맨 바깥에 둔다).
+        .onChange(of: isTakingReadings) { _, taking in
+            pastTakeSnapshot = taking ? PastTakeSnapshot(take: currentPastTake()) : nil
         }
         // 오늘 연습 기록이 남으면 오늘 알림은 보내지 않는다.
         .onChange(of: audio.savedSessionCount) {
@@ -190,7 +211,19 @@ struct ContentView: View {
                 isMeasuringBaseline = true
             }
 
-            if let summary, let title = audio.lastTakeTitle {
+            // 새로 녹음하는(재는) 동안에는 지난 녹음을 흐리게 남겨 둔다. 숨기면 녹음을 시작·끝낼 때마다
+            // 아래 문장 카드·대본이 카드 높이만큼 위아래로 튄다 (2026-11-15). 찍어 두기 전 한 번은 지금 값으로 그린다.
+            if isTakingReadings {
+                if let past = pastTakeSnapshot.map(\.take) ?? currentPastTake() {
+                    RecordingSummaryView(
+                        title: "지난 녹음", summary: past.summary, isSaved: past.isSaved, isSaving: false,
+                        onSave: { _ in }, onShare: { _ in },
+                        phraseEndings: past.phraseEndings, takeStart: past.takeStart
+                    )
+                    .disabled(true)
+                    .opacity(0.55)
+                }
+            } else if let summary, let title = audio.lastTakeTitle {
                 let phraseEndings = audio.lastTakePhraseEndings(target: target)
                 RecordingSummaryView(
                     title: title, summary: summary, isSaved: lastTakeIsSaved, isSaving: audio.isSavingTake,
@@ -266,10 +299,25 @@ struct ContentView: View {
         return min(targetLower, targetUpper)...max(targetLower, targetUpper)
     }
 
-    /// 마지막 녹음의 피치 요약 (그 녹음 묶음의 기록으로). 녹음하는 동안에는 숨긴다.
+    /// 마지막 녹음의 피치 요약 (그 녹음 묶음의 기록으로). 녹음·재기 중에는 쓰지 않는다 (`pastTakeSnapshot`)
     private var summary: PitchSummary? {
-        if case .recording = audio.loop.phase { return nil }
-        return audio.lastTakeSummary(target: target)
+        audio.lastTakeSummary(target: target)
+    }
+
+    /// 마이크의 점이 기록에 쌓이는 단계 (녹음, 내 목소리·모음 재기). 이때는 `audio.timeline`을 화면에서 읽지 않는다
+    private var isTakingReadings: Bool {
+        switch audio.loop.phase {
+        case .recording, .measuring: true
+        default: false
+        }
+    }
+
+    /// 지금 마지막 녹음으로 지난 녹음 카드의 내용을 만든다 (녹음·재기를 시작할 때 한 번)
+    private func currentPastTake() -> PastTake? {
+        guard let summary = audio.lastTakeSummary(target: target) else { return nil }
+        return PastTake(summary: summary, isSaved: lastTakeIsSaved,
+                        phraseEndings: audio.lastTakePhraseEndings(target: target),
+                        takeStart: audio.lastTakeStartTime ?? 0)
     }
 
     /// 마지막 녹음을 m4a로 만들어 파일 저장 창을 연다.
