@@ -107,6 +107,7 @@
 | `Docs/DEVICE_TEST.md` | 아이폰에서 직접 확인할 목록 (화면 순서대로, 약 35분) |
 | `Docs/screenshots/` | README에 붙인 화면 캡처 (시뮬레이터, 합성음·가짜 기록) |
 | `Docs/WEB_PLAN.md` | 웹(PWA)·안드로이드(APK) 계획: 정한 것, 단계(W0~W5, A1·A2)와 상태, iOS와 다른 점 |
+| `.github/workflows/deploy-pages.yml` | 웹 배포: `main`에 올리면 타입 검사·웹 테스트·빌드 뒤 `web/dist`를 GitHub Pages(https://uviro.github.io/ullim/)에 올린다 (2026-11-15) |
 | `web/package.json`, `web/package-lock.json` | 웹 버전이 쓰는 도구와 정확한 버전, 명령(`dev`·`build`·`test`·`check`) |
 | `web/vite.config.ts`, `web/tsconfig.json` | 웹 빌드·테스트 설정 (상대 경로로 빌드: GitHub Pages·APK 어디서나 열리게). 개발 서버가 내줄 파일을 `web/`과 대본 JSON으로 좁히고, `dev:lan`일 때만 와이파이에 HTTPS로 연다 |
 | `web/index.html` | 웹 첫 페이지. 앱 자신의 파일 말고는 연결하지 못하게 막는 CSP (원칙 2) |

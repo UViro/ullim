@@ -58,7 +58,7 @@ Voice Tools 앱에서 영감을 받았지만, 한국어 화자 기준(모음별 
    - 점수·등급·향상률·연속 기록(스트릭)은 쓰지 않는다. 숫자와 그래프만 보여 준다
 
 그 뒤 (순서 미정)
-- 웹(PWA)·안드로이드(APK) 버전 (2026-10-25 시작, 계획은 `Docs/WEB_PLAN.md`): W0 준비 ✅ / W1 분석 코드 ✅ / W2 마이크 입력 ✅ / W3 [높이] 화면 ✅ / W4 연습 흐름 ✅ / W5 탭 + [모음] ✅ / W6 내 기록 폴더 ✅ / W7 기록 남기기 ✅ / W8 [기록] 화면 ✅ / W9 두 녹음 비교 ✅ / W10 PWA·배포 / A1·A2 APK (2026-10-25 사용자 결정: 웹 먼저, 기록은 브라우저가 아니라 내 폴더·휴대폰에 파일로)
+- 웹(PWA)·안드로이드(APK) 버전 (2026-10-25 시작, 계획은 `Docs/WEB_PLAN.md`): W0 준비 ✅ / W1 분석 코드 ✅ / W2 마이크 입력 ✅ / W3 [높이] 화면 ✅ / W4 연습 흐름 ✅ / W5 탭 + [모음] ✅ / W6 내 기록 폴더 ✅ / W7 기록 남기기 ✅ / W8 [기록] 화면 ✅ / W9 두 녹음 비교 ✅ / W10 배포 ✅(GitHub Pages, 2026-11-15)·PWA 남음 / A1·A2 APK (2026-10-25 사용자 결정: 웹 먼저, 기록은 브라우저가 아니라 내 폴더·휴대폰에 파일로)
 - 5단계: 문장 단위 억양 곡선
 - 외국어 연습 (2026-10-25 아이디어: 외국어로 말할 때 피치가 많이 달라진다): 영어 발표·일본어 스피치 연습 문장과 대본, 언어별 기준 목소리, 일본어 5모음 지도, 언어별 억양(5단계와 이어짐). 화면 글자는 한국어 그대로
 
@@ -149,6 +149,7 @@ Voice Tools 앱에서 영감을 받았지만, 한국어 화자 기준(모음별 
 - 저장된 기록을 지울 때는 `delete(model:)`(한꺼번에 지우기) 대신 하나씩 지운다. 한꺼번에 지우면 화면의 `@Query` 목록이 바로 따라 바뀌지 않는다는 보고가 있어서 피했다 (직접 재현하지는 않음).
 
 ## 웹 버전 메모 (`web/`, 2026-10-25~)
+- 배포(2026-11-15~): 저장소 `UViro/ullim`(공개)의 `main`에 올리면 `.github/workflows/deploy-pages.yml`이 Node 24로 `npm --prefix web ci --ignore-scripts` → 타입 검사 → 웹 테스트 → 빌드 → `web/dist`를 GitHub Pages(https://uviro.github.io/ullim/)에 올린다. 하나라도 실패하면 배포하지 않는다. 쓰는 action은 커밋 번호로 고정했다(올릴 때는 `gh api repos/<action>/releases`로 새 판·나온 날짜를 보고 커밋 번호를 바꾼다). 빌드가 상대 경로(`base: './'`)라 `/ullim/` 아래에서도 열린다. 배포 주소는 공개이고, GitHub이 방문자 IP를 기록한다(앱은 어디로도 보내지 않는다)
 - 명령 (저장소 맨 위에서): 테스트 `npm --prefix web test`, 타입 검사 `npm --prefix web run check`(경고도 실패), 빌드 `npm --prefix web run build`, 개발 서버 `npm --prefix web run dev`(이 컴퓨터에서만)
 - 휴대폰으로 열어 보기: `npm --prefix web run dev:lan` — 같은 와이파이에서 여는 임시 HTTPS 개발 서버 (`@vitejs/plugin-basic-ssl`이 개발용 임시 인증서를 만든다, 앱에는 안 들어감). 휴대폰 브라우저는 https에서만 마이크를 켜 준다. 터미널의 ‘Network:’ 주소를 열고 인증서 경고를 넘긴다. 다 보면 Ctrl+C로 끈다
   - 개발 서버가 내줄 수 있는 파일은 `web/`과 iOS와 같이 쓰는 JSON 두 개(대본 `PracticeScripts.json`, 문장 끝 기준값 `PhraseEndingRules.json` — 2026-10-25 사용자 승인으로 더함)뿐이다 (`vite.config.ts`의 `server.fs.allow`). 저장소 맨 위의 `Validation/`(개인 녹음 자료)·`Signing.local.xcconfig`·Swift 코드는 403으로 막힌다 (2026-10-25 확인). 이 목록을 넓히지 않는다 (꼭 필요하면 파일 하나씩, 먼저 승인)

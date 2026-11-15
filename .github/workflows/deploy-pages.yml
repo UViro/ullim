@@ -1,0 +1,52 @@
+# 웹 버전을 GitHub Pages(https://uviro.github.io/ullim/)에 배포한다 (2026-11-15, W10).
+# main에 올리면 타입 검사·웹 테스트·빌드를 거쳐 web/dist를 올린다. 하나라도 실패하면 배포하지 않는다.
+# 순서는 Vite 문서의 GitHub Pages 예시를 따랐다 (https://vite.dev/guide/static-deploy.html).
+# 남이 태그를 바꿔치기해도 영향이 없게, 쓰는 단계(action)는 버전 이름이 아니라 커밋 번호로 고정한다.
+name: 웹 배포 (GitHub Pages)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 배포는 한 번에 하나만. 진행 중인 배포는 끊지 않고 끝까지 둔다 (반쯤 올라간 상태가 남지 않게).
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          # Vitest가 지원 목록에 적은 장기 지원판 (이 Mac은 25)
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      # 웹 빌드는 web/ 밖의 대본·문장 끝 기준값 JSON(VoicePractice/Models/)도 읽으므로 저장소 맨 위에서 돌린다.
+      # 패키지는 잠금 파일 그대로, 설치 스크립트 없이 설치한다 (이 Mac에서 설치한 방식과 같다).
+      - run: npm --prefix web ci --ignore-scripts
+      - run: npm --prefix web run check
+      - run: npm --prefix web test
+      - run: npm --prefix web run build
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

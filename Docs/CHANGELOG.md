@@ -985,3 +985,10 @@ PROGRESS.md의 ‘현재 상태’가 2026-10-25부터 한 단락에 계속 덧�
 ## 새 저장소로 옮김 (2026-11-15)
 - 새 GitHub 계정의 비공개 저장소 `UViro/ullim`에 예전 저장소의 커밋 기록 없이 소스만 올렸다(예전 저장소가 관리하던 파일 296개). `.gitignore`에 비밀 값(`.env`, `*.p12`, `*.mobileprovision`)과 Swift 패키지 빌드(`.build/`, `.swiftpm/`) 줄을 더했다
 - 예전 아이디를 지우려고 안드로이드 앱 ID를 `io.github.uviro.ullim`으로 바꿨다(`capacitor.config.ts`, `build.gradle`의 `namespace`·`applicationId`, `strings.xml`, `MainActivity.java`의 패키지와 폴더). 예전에 깐 안드로이드 앱과는 다른 앱이 되므로 예전 앱을 지우고 새로 깔아야 하고, 예전 기록은 예전 앱에서 ‘기록 파일로 저장’한 zip을 새 앱의 ‘기록 파일 불러오기’로 옮긴다. 이 변경 뒤 APK 빌드는 아직 돌려 보지 않았다
+
+## 웹 배포 — GitHub Pages (2026-11-15, W10의 배포 부분)
+사용자가 저장소 `UViro/ullim`을 공개로 바꾸고 GitHub Pages 배포 계획을 승인(“ㄱㄱ”). 무료 계정의 GitHub Pages는 공개 저장소에서만 되고, 사이트는 저장소가 비공개여도 누구나 볼 수 있다(GitHub 문서 ‘About GitHub's plans’)
+- `.github/workflows/deploy-pages.yml`: `main`에 올리거나 손으로 실행하면 Node 24로 `npm --prefix web ci --ignore-scripts` → `check` → `test` → `build` → `web/dist`를 Pages에 올린다. Vite 문서의 GitHub Pages 예시를 따랐고, 진행 중인 배포는 끊지 않게 했다(`cancel-in-progress: false`). action은 커밋 번호로 고정: checkout v7.0.1, setup-node v7.1.0, configure-pages v6.0.0, upload-pages-artifact v5.0.0, deploy-pages v5.0.1(모두 나온 지 한 달 넘음)
+- 저장소 설정: Pages 배포 방식을 GitHub Actions로(`gh api -X POST repos/UViro/ullim/pages -f build_type=workflow`, https 강제)
+- 확인(올리기 전): 저장소를 새로 받은 임시 폴더에서 같은 순서 — 설치, 타입 검사 오류·경고 0, 웹 테스트 346개, 빌드 모두 통과(이 Mac은 Node 25). `npm audit`: 웹사이트에 들어가는 패키지는 취약점 0, 개발 도구 쪽(Capacitor CLI가 쓰는 deepmerge·glob·minimatch·uuid)에 8개(낮음 2, 중간 6) — 이번에는 고치지 않음
+- PROGRESS의 ‘예전 브랜치를 순서대로 PR·합치기’ 할 일은 예전 저장소 이야기라 뺐다(새 저장소에는 그 브랜치들이 없고, 내용은 첫 커밋에 다 들어 있다)
