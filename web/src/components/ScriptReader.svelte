@@ -1,0 +1,232 @@
+<script lang="ts">
+  import { onDestroy } from 'svelte'
+  import {
+    ANY_CATEGORY,
+    estimatedSeconds,
+    filterScripts,
+    PRACTICE_SCRIPTS,
+    SCRIPT_LENGTHS,
+    scriptCategories,
+    scriptDetails,
+    shuffledOrder,
+    type ScriptLength,
+  } from '../data/scripts'
+  import { PracticeDuration } from '../model/practice'
+  import { MY_SCRIPT_CATEGORY, myScriptIdOf, practiceScriptOf } from '../model/scriptImport'
+  import { settings } from '../model/settings.svelte'
+  import type { TakeScript } from '../model/takeScript'
+  import { session } from '../practice/session.svelte'
+  import { store } from '../storage/recordStore.svelte'
+  import { resolveParticles } from '../text/korean'
+  import { navigation } from './navigation.svelte'
+  import ScriptImportSheet from './ScriptImportSheet.svelte'
+
+  /**
+   * 대본 낭독 (iOS `ScriptReaderView`). 종류·길이로 거르고, 상자 안에서 스크롤해 읽고,
+   * 들려줄 길이를 대본 길이에 맞출 수 있다. 그래프가 화면 위에 고정되어 있어서 대본은 이 상자 안에서 넘기며 읽는다.
+   * 대본은 섞인 순서로 보인다 (`shuffledOrder`): 이 조각이 새로 생길 때(대본으로 바꿀 때·앱을 열 때)마다 다른 대본부터.
+   * AI 앱에서 가져온 내 대본(`store.myScripts`)은 ‘내 대본’ 종류로 맨 뒤에 붙고, 그 카드에서만 지울 수 있다.
+   * 보이는 대본은 연습 흐름에 알린다 (녹음마다 읽은 대본을 연습 기록에 남기려고, iOS `onScriptChange`).
+   */
+  let { isPracticing }: { isPracticing: boolean } = $props()
+
+  /** 앱에 든 대본 + 내 대본 */
+  const scripts = $derived([...PRACTICE_SCRIPTS, ...store.myScripts.map(practiceScriptOf)])
+  const categories = $derived(scriptCategories(scripts))
+  let importing = $state(false)
+  /** 섞인 순서에서 몇 번째인지 (0부터) */
+  let position = $state(0)
+  let textBox: HTMLDivElement | undefined = $state()
+
+  const category = $derived(categories.includes(settings.scriptCategory) ? settings.scriptCategory : ANY_CATEGORY)
+  const filtered = $derived(filterScripts(category, settings.scriptLength, scripts))
+  // 거르기가 바뀌면(filtered가 새 배열이 되면) 다시 섞는다
+  const order = $derived(shuffledOrder(filtered.length))
+  const current = $derived(filtered[order[Math.min(position, order.length - 1)]])
+  const suggested = $derived(current ? PracticeDuration.suggestedFor(estimatedSeconds(current)) : null)
+
+  // 녹음마다 읽은 대본을 정하려고 보이는 대본을 알린다. 다른 탭으로 가면 이 화면은 숨기만 하므로(App.svelte) 대본이 없는 것으로 알린다
+  // ([모음]에서 녹음해도 [높이]의 대본을 읽은 것으로 세지 않게. iOS는 탭을 바꾸면 화면이 사라진다)
+  const shownScript: TakeScript | null = $derived(
+    current === undefined || navigation.tab !== 'pitch' ? null : { id: current.id, title: current.title },
+  )
+  $effect(() => session.showScript(shownScript))
+  onDestroy(() => session.showScript(null))
+
+  // 대본이 바뀌면 스크롤을 맨 위로 되돌린다.
+  $effect(() => {
+    void current?.id
+    textBox?.scrollTo({ top: 0 })
+  })
+
+  function chooseCategory(event: Event) {
+    settings.setScriptCategory((event.target as HTMLSelectElement).value)
+    position = 0
+  }
+  function chooseLength(event: Event) {
+    settings.setScriptLength((event.target as HTMLSelectElement).value as ScriptLength)
+    position = 0
+  }
+  /** 가져온 대본을 남기면 ‘내 대본’ 종류를 보여 준다 */
+  function showMyScripts() {
+    settings.setScriptCategory(MY_SCRIPT_CATEGORY)
+    position = 0
+  }
+
+  async function removeCurrent() {
+    const id = current === undefined ? null : myScriptIdOf(current)
+    if (id === null) return
+    // 제목 끝 받침에 따라 을/를이 달라지므로 받침이 있는 ‘대본’에 조사를 붙인다 (iOS와 같은 글)
+    if (!confirm(`‘${current!.title}’ 대본을 지울까요?\n내 대본에서 지워지고 되돌릴 수 없어요.`)) return
+    await store.removeScript(id)
+  }
+
+  function shuffle() {
+    if (filtered.length < 2) return
+    const others = filtered.map((_, i) => i).filter((i) => i !== position)
+    position = others[Math.floor(Math.random() * others.length)]
+  }
+</script>
+
+<div class="reader">
+  <div class="filters">
+    <select value={category} onchange={chooseCategory} aria-label="대본 종류">
+      <option value={ANY_CATEGORY}>전체 종류</option>
+      {#each categories as name (name)}
+        <option value={name}>{name}</option>
+      {/each}
+    </select>
+    <select value={settings.scriptLength} onchange={chooseLength} aria-label="대본 길이">
+      {#each SCRIPT_LENGTHS as length (length.id)}
+        <option value={length.id}>{length.label}</option>
+      {/each}
+    </select>
+    <span class="spacer"></span>
+    <button class="small" onclick={() => (importing = true)} aria-label="AI 대본 가져오기">⤓</button>
+    <button class="small" onclick={shuffle} disabled={filtered.length < 2} aria-label="다른 대본">⤨</button>
+  </div>
+
+  {#if current}
+    <article class="card">
+      <h3>{current.title}</h3>
+      <p class="details">{scriptDetails(current)}</p>
+      <!-- 스크롤되는 상자는 키보드로도 넘길 수 있게 초점을 받아야 한다 (WCAG: 스크롤 영역은 키보드로 닿아야 함). -->
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+      <div class="text" bind:this={textBox} tabindex="0" role="region" aria-label="대본 본문">
+        <p>{current.text}</p>
+      </div>
+      {#if current.needsFactCheck}
+        <p class="details">아직 사실 확인을 거치지 않은 글이에요.</p>
+      {/if}
+      {#if current.category === MY_SCRIPT_CATEGORY}
+        <button class="small danger" onclick={removeCurrent}>이 대본 지우기</button>
+      {/if}
+    </article>
+
+    <nav class="navigation" aria-label="대본 넘기기">
+      <button class="plain" onclick={() => (position = Math.max(0, position - 1))} disabled={position === 0}>‹ 이전</button>
+      <span class="counter">{Math.min(position, filtered.length - 1) + 1} / {filtered.length}</span>
+      <button
+        class="plain"
+        onclick={() => (position = Math.min(filtered.length - 1, position + 1))}
+        disabled={position >= filtered.length - 1}
+      >
+        다음 ›
+      </button>
+    </nav>
+    {#if suggested !== null}
+      <button
+        class="plain fit"
+        onclick={() => settings.setPracticeDuration(suggested)}
+        disabled={isPracticing || settings.practiceDuration === suggested}
+      >
+        ⏱ {resolveParticles(`들려줄 길이를 ${PracticeDuration.label(suggested)}(으)로 맞추기`)}
+      </button>
+    {/if}
+  {:else}
+    <p class="empty">{PRACTICE_SCRIPTS.length === 0 ? '대본 파일을 읽지 못했어요.' : '조건에 맞는 대본이 없어요.'}</p>
+  {/if}
+</div>
+
+<ScriptImportSheet open={importing} onClose={() => (importing = false)} onSaved={showMyScripts} />
+
+<style>
+  .reader {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .filters {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .spacer {
+    flex: 1;
+  }
+  select {
+    font: inherit;
+    font-size: 0.85rem;
+    color: var(--target);
+    background: transparent;
+    border: none;
+    padding: 4px 0;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 16px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  h3 {
+    margin: 0;
+    font-size: 1.05rem;
+  }
+  .details {
+    margin: 0;
+    color: var(--secondary);
+    font-size: 0.75rem;
+  }
+  .text {
+    height: 15rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .text p {
+    margin: 0;
+    font-size: 1.05rem;
+    line-height: 1.75;
+    word-break: keep-all;
+    overflow-wrap: break-word;
+  }
+  .navigation {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.9rem;
+  }
+  .counter {
+    color: var(--secondary);
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .fit {
+    align-self: center;
+    font-size: 0.85rem;
+  }
+  .danger {
+    align-self: flex-start;
+    background: color-mix(in srgb, #ff3b30 14%, transparent);
+    color: #ff3b30;
+  }
+  .empty {
+    color: var(--secondary);
+    font-size: 0.85rem;
+    min-height: 7.5rem;
+    display: grid;
+    place-items: center;
+  }
+</style>

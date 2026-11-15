@@ -1,0 +1,168 @@
+import SwiftUI
+
+/// 한국어 연습 문장 카드. 좌우로 밀거나 이전/다음 버튼으로 넘긴다.
+/// 직접 쓴 문장, 패턴으로 자동 생성한 문장, 긴 낭독 대본 중에서 고를 수 있다.
+struct SentenceCardView: View {
+    /// 고른 문장 종류를 저장하는 키. [높이] 화면이 대본을 읽는 중인지 알아 그래프를 줄이는 데도 쓴다.
+    static let sourceKey = "sentenceSource"
+
+    enum Source: String, CaseIterable, Identifiable {
+        case mine = "내 문장"
+        case generated = "자동 생성"
+        case scripts = "대본"
+
+        var id: Self { self }
+    }
+
+    /// 연습 중인지. 대본의 "들려줄 길이 맞추기"를 잠그는 데 쓴다.
+    let isPracticing: Bool
+    /// 보이는 대본이 바뀔 때마다 알린다 (`ScriptReaderView`). 대본이 아닌 문장을 보면 nil
+    var onScriptChange: (TakeScript?) -> Void = { _ in }
+
+    @AppStorage(Self.sourceKey) private var source = Source.mine
+    @State private var generatedSentences: [String] = []
+    @State private var index = 0
+    /// 문장 묶음이 바뀔 때마다 늘려서 카드 넘김 상태를 처음부터 다시 그리게 한다.
+    @State private var deckID = 0
+    /// 넘기는 카드는 높이를 정해 줘야 해서, 문장 글자(title3) 크기 설정에 맞춰 같이 키운다.
+    /// 고정 높이였을 때는 아주 큰 글자에서 문장 첫 줄이 잘렸다.
+    @ScaledMetric(relativeTo: .title3) private var cardHeight: CGFloat = 120
+
+    private var sentences: [String] {
+        source == .mine ? PracticeSentences.all : generatedSentences
+    }
+
+    var body: some View {
+        VStack(spacing: 8) {
+            HStack {
+                Picker("문장 종류", selection: $source) {
+                    ForEach(Source.allCases) { source in
+                        Text(source.rawValue).tag(source)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                if source == .generated {
+                    Button {
+                        generateSentences()
+                    } label: {
+                        Label("새 문장", systemImage: "arrow.clockwise")
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+
+            if source == .scripts {
+                ScriptReaderView(isPracticing: isPracticing, onScriptChange: onScriptChange)
+            } else if sentences.isEmpty {
+                Text("연습 문장이 없어요. PracticeSentences.swift에 문장을 추가해 주세요.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 120)
+            } else {
+                cards
+            }
+        }
+        .onAppear {
+            if generatedSentences.isEmpty {
+                generateSentences()
+            }
+        }
+        .onChange(of: source) {
+            index = 0
+            deckID += 1
+        }
+    }
+
+    private var cards: some View {
+        VStack(spacing: 8) {
+            TabView(selection: $index) {
+                ForEach(sentences.indices, id: \.self) { i in
+                    card(for: sentences[i])
+                        .padding(.horizontal, 2)
+                        .tag(i)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .frame(height: cardHeight)
+            .id(deckID)
+
+            HStack {
+                Button {
+                    withAnimation { index -= 1 }
+                } label: {
+                    Label("이전", systemImage: "chevron.left")
+                }
+                .disabled(index == 0)
+
+                Spacer()
+                Text("\(index + 1) / \(sentences.count)")
+                    .font(.footnote)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                Spacer()
+
+                Button {
+                    withAnimation { index += 1 }
+                } label: {
+                    Label("다음", systemImage: "chevron.right")
+                        .labelStyle(TrailingIconLabelStyle())
+                }
+                .disabled(index == sentences.count - 1)
+            }
+            .font(.subheadline)
+        }
+    }
+
+    private func card(for sentence: String) -> some View {
+        VStack(spacing: 10) {
+            WordWrappedText(text: sentence, textStyle: .title3, weight: .medium, alignment: .center)
+            Text(vowelSummary(for: sentence))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func generateSentences() {
+        var generator = SystemRandomNumberGenerator()
+        generatedSentences = SentenceGenerator().makeDeck(using: &generator).map(\.text)
+        index = 0
+        deckID += 1
+    }
+
+    /// 예: "많이 나오는 모음  아 3 · 이 2"
+    private func vowelSummary(for sentence: String) -> String {
+        let top = KoreanVowel.mostFrequent(in: sentence)
+        guard !top.isEmpty else { return " " }
+        return "많이 나오는 모음  " + top.map { "\($0.vowel.rawValue) \($0.count)" }.joined(separator: " · ")
+    }
+}
+
+/// "다음 >"처럼 아이콘을 글자 오른쪽에 둔다.
+private struct TrailingIconLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 4) {
+            configuration.title
+            configuration.icon
+        }
+    }
+}
+
+#Preview {
+    SentenceCardView(isPracticing: false)
+        .padding()
+}
+
+/// 문장 카드는 ‘연습 중인지’가 바뀔 때만 다시 그린다 (`ContentView`가 `.equatable()`로 쓴다).
+/// 넘겨받는 `onScriptChange`는 클로저라 SwiftUI가 같은지 비교하지 못해서, 그대로 두면 [높이] 화면이 다시 그려질 때마다
+/// (메모 창의 자판이 올라오는 동안 프레임마다 등) 대본 칸까지 다시 계산된다 (2026-11-05, 기록에 남길 때 버벅임).
+/// 클로저는 늘 같은 일(`audio.showScript`)을 하므로 비교에서 빼도 된다. 문장 종류·대본 고르기처럼 이 화면 안의 상태는
+/// 비교와 상관없이 바뀌면 다시 그려진다.
+extension SentenceCardView: Equatable {
+    nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.isPracticing == rhs.isPracticing
+    }
+}
