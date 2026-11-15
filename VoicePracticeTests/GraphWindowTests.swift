@@ -20,6 +20,31 @@ struct GraphWindowTests {
         #expect(clock.endTime(now: 130) == 130)
     }
 
+    @Test("녹음 중 화소 한 칸 맞추기: 지나간 시각은 늘 정확히 화소 몇 칸씩만 옮겨진다 (선이 아른거리지 않게, 2026-11-15)")
+    func alignedToPixels() {
+        let pixels = 343.0 * 3  // 아이폰 폭의 그래프 안쪽(기기 화소)
+        let step = 60 / pixels
+        var previous: Double?
+        for frame in 0..<60 {
+            let now = 65 + Double(frame) / 60
+            let window = GraphWindow.live(recordingStart: 0, now: now, duration: 60, round: 1).alignedToPixels(pixels)
+            #expect(window.end <= now)
+            #expect(now - window.end < step + 1e-9)
+            #expect(window.duration == 60 && window.recordingStart == 0 && window.round == 1)
+            // 30초 시각이 그려지는 기기 화소 자리: 프레임마다 정수 칸만큼만 움직인다
+            let x = window.position(of: 30) * pixels
+            if let previous {
+                let moved = previous - x
+                #expect(abs(moved - moved.rounded()) < 1e-6, "\(frame)번째: \(moved)칸")
+                #expect(moved.rounded() >= 0)
+            }
+            previous = x
+        }
+        // 화소 수를 모르면(0) 그대로 둔다
+        let plain = GraphWindow.live(recordingStart: 0, now: 65.123, duration: 60)
+        #expect(plain.alignedToPixels(0) == plain)
+    }
+
     @Test("흐르는 중에 그래프에 보이는 구간 = 다시 들을 수 있는 소리 = 요약 수치 구간")
     func windowMatchesKeptSound() throws {
         // 100초에 녹음 시작, 25초 녹음, 들려줄 길이 10초 → 녹음 통에는 115~125초만 남는다

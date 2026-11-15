@@ -5,7 +5,7 @@
   import { contains } from '../dsp/range'
   import { LevelMeter, ResonanceMeter, type ResonanceReading } from '../dsp/voiceMeters'
   import { graphDescription, graphLabel, meterDescription } from '../graph/descriptions'
-  import { drawPitchGraph, type GraphColors } from '../graph/pitchGraph'
+  import { drawPitchGraph, plotRect, type GraphColors } from '../graph/pitchGraph'
   import { settings } from '../model/settings.svelte'
   import { session } from '../practice/session.svelte'
 
@@ -66,10 +66,15 @@
     const now = session.now()
     const clock = session.clock
     const endTime = clockEndTime(clock, now)
-    const window = clockWindow(clock, now) ?? session.idleWindow(endTime, settings.practiceDuration)
+    const isLive = clock.kind === 'live'
+    const ratio = globalThis.devicePixelRatio || 1
+    const clockSpan = clockWindow(clock, now)
+    // 녹음 중에는 가로축을 그래프 화소 한 칸씩 옮긴다 (조금씩 흘리면 촘촘한 선이 아른거린다, 2026-11-15)
+    const window =
+      (isLive && clockSpan !== null ? clockSpan.alignedToPixels(plotRect(width, height).width * ratio) : clockSpan) ??
+      session.idleWindow(endTime, settings.practiceDuration)
     const history = session.history
     const moving = clockIsMoving(clock)
-    const isLive = clock.kind === 'live'
 
     frequency = isLive ? history.frequencyAt(endTime) : clock.kind === 'replay' ? history.frequencyAt(endTime) : null
     // 막대는 최근 3초 남짓만 꺼내 계산한다. 움직이지 않으면 비운다 (iOS와 같다).
@@ -80,7 +85,6 @@
     resonance = ResonanceMeter.current(recent, endTime)
 
     if ((moving || dirty) && canvas && width > 0) {
-      const ratio = globalThis.devicePixelRatio || 1
       const pixelWidth = Math.round(width * ratio)
       const pixelHeight = Math.round(height * ratio)
       if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {

@@ -312,9 +312,16 @@ struct PitchGraphView: View {
 
     // MARK: - 그래프
 
-    private func drawGraph(in context: inout GraphicsContext, size: CGSize, window: GraphWindow, endTime: TimeInterval) {
+    private func drawGraph(in context: inout GraphicsContext, size: CGSize, window clockWindow: GraphWindow, endTime: TimeInterval) {
         // 왼쪽은 Hz 숫자(세 자리), 아래는 시간 표시 자리로 비워 둔다. 그래프가 넓게 보이게 양옆 여백은 좁게.
         let plot = CGRect(x: 34, y: 12, width: size.width - 42, height: size.height - 36)
+        // 녹음 중에는 가로축을 그래프 화소 한 칸씩 옮긴다 (조금씩 흘리면 촘촘한 선이 아른거린다, 2026-11-15)
+        let window: GraphWindow
+        if case .live = clock {
+            window = clockWindow.alignedToPixels(Double(plot.width * displayScale))
+        } else {
+            window = clockWindow
+        }
 
         // 가로: 가로축 구간 안의 위치. 세로: 반음 눈금 (Hz가 아니라 비율(반음) 간격으로 위치를 정한다).
         func x(_ time: TimeInterval) -> CGFloat {

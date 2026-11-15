@@ -19,6 +19,30 @@ describe('GraphWindow (가로축)', () => {
     expect(clockEndTime(clock, 130)).toBe(130)
   })
 
+  it('녹음 중 화소 한 칸 맞추기: 지나간 시각은 늘 정확히 화소 몇 칸씩만 옮겨진다 (선이 아른거리지 않게, 2026-11-15)', () => {
+    const pixels = 343 * 3 // 아이폰 폭의 그래프 안쪽(기기 화소)
+    const step = 60 / pixels
+    let previous: number | null = null
+    for (let frame = 0; frame < 60; frame++) {
+      const now = 65 + frame / 60
+      const window = GraphWindow.live(0, now, 60, 1).alignedToPixels(pixels)
+      expect(window.end).toBeLessThanOrEqual(now)
+      expect(now - window.end).toBeLessThan(step + 1e-9)
+      expect([window.duration, window.recordingStart, window.round]).toEqual([60, 0, 1])
+      // 30초 시각이 그려지는 기기 화소 자리: 프레임마다 정수 칸만큼만 움직인다
+      const x = window.position(30) * pixels
+      if (previous !== null) {
+        const moved = previous - x
+        expect(Math.abs(moved - Math.round(moved))).toBeLessThan(1e-6)
+        expect(Math.round(moved)).toBeGreaterThanOrEqual(0)
+      }
+      previous = x
+    }
+    // 화소 수를 모르면(0) 그대로 둔다
+    const plain = GraphWindow.live(0, 65.123, 60)
+    expect(plain.alignedToPixels(0)).toBe(plain)
+  })
+
   it('녹음 시작선: 첫 녹음은 ‘시작’, 다시 녹음하면 ‘2번째’ 경계선. 녹음 시작이 가로축 안일 때만 긋는다', () => {
     const first = clockWindow({ kind: 'live', start: 100, duration: 60, round: 1 }, 120)!
     expect(first.startLabel).toBe('시작')

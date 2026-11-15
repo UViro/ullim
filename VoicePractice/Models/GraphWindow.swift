@@ -45,6 +45,17 @@ struct GraphWindow: Equatable {
         GraphWindow(start: now - duration, duration: duration, recordingStart: recordingStart, round: round)
     }
 
+    /// 오른쪽 끝을 그래프 화소 한 칸(`duration / pixels`초) 단위로 내려 맞춘 구간 (녹음 중 흐르는 그래프용, 2026-11-15).
+    /// 그대로 흘리면 가로축이 길 때(1분이면 한 프레임에 화소 1/5칸쯤) 선이 화소 사이에 걸치는 모양이 매 프레임 달라져
+    /// 촘촘한 꺾은선 전체가 아른거린다. 한 칸씩 옮기면 같은 그림이 정확히 한 칸씩 밀려 가서 그림이 바뀌지 않는다.
+    /// `pixels`: 그래프 안쪽 가로 폭의 기기 화소 수.
+    func alignedToPixels(_ pixels: Double) -> GraphWindow {
+        guard pixels > 0 else { return self }
+        let step = duration / pixels
+        let end = (self.end / step).rounded(.down) * step
+        return GraphWindow(start: end - duration, duration: duration, recordingStart: recordingStart, round: round)
+    }
+
     /// 가로축 눈금 간격 후보 [s]. 눈금이 6개 이하가 되는 가장 촘촘한 간격을 쓴다.
     static let tickSteps: [TimeInterval] = [2, 5, 10, 15, 30, 60]
 

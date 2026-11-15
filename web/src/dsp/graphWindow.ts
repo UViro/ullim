@@ -50,6 +50,19 @@ export class GraphWindow {
   }
 
   /**
+   * 오른쪽 끝을 그래프 화소 한 칸(`duration / pixels`초) 단위로 내려 맞춘 구간 (녹음 중 흐르는 그래프용, 2026-11-15).
+   * 그대로 흘리면 가로축이 길 때(1분이면 한 프레임에 화소 1/5칸쯤) 선이 화소 사이에 걸치는 모양이 매 프레임 달라져
+   * 촘촘한 꺾은선 전체가 아른거린다. 한 칸씩 옮기면 같은 그림이 정확히 한 칸씩 밀려 가서 그림이 바뀌지 않는다.
+   * `pixels`: 그래프 안쪽 가로 폭의 기기 화소 수.
+   */
+  alignedToPixels(pixels: number): GraphWindow {
+    if (!(pixels > 0)) return this
+    const step = this.duration / pixels
+    const end = Math.floor(this.end / step) * step
+    return new GraphWindow(end - this.duration, this.duration, this.recordingStart, this.round)
+  }
+
+  /**
    * 녹음 하나를 보여 줄 가로축 (iOS `RecordedTake.graphWindow`): 녹음이 끝난 때가 오른쪽 끝,
    * 길이는 녹음할 때의 그래프 길이(들려줄 길이). 녹음이 더 길면 녹음 길이만큼.
    */
