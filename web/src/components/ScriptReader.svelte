@@ -107,7 +107,8 @@
   </div>
 
   {#if current}
-    <article class="card">
+    <!-- data-reading: 다 듣고 다시 녹음할 때 [높이] 화면이 이곳으로 내려온다 (PitchScreen) -->
+    <article class="card" data-reading>
       <h3>{current.title}</h3>
       <p class="details">{scriptDetails(current)}</p>
       <!-- 스크롤되는 상자는 키보드로도 넘길 수 있게 초점을 받아야 한다 (WCAG: 스크롤 영역은 키보드로 닿아야 함). -->

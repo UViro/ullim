@@ -67,6 +67,7 @@
   {:else}
     <div
       class="card"
+      data-reading
       onpointerdown={onPointerDown}
       onpointerup={onPointerUp}
       onpointercancel={() => (swipeStartX = null)}

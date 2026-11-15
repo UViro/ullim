@@ -55,6 +55,8 @@
   let summaryBox: HTMLDivElement | null = $state(null)
   /** 마지막으로 올려 보인 녹음 (같은 녹음으로 두 번 올리지 않게) */
   let revealedTakeId: number | null = null
+  /** 바로 앞 단계 (다 듣고 다음 녹음으로 넘어가는 때를 알려고) */
+  let previousPhase: string = session.phase.kind
 
   // 녹음이 끝나 새 요약이 생기면(지금 들어보기·정지·파일 불러오기) 아래 화면을 올려 요약 카드를 보인다 (2026-11-15 사용자 요청)
   $effect(() => {
@@ -64,10 +66,25 @@
     void tick().then(() => untrack(revealSummary))
   })
 
+  // 다 듣고(또는 건너뛰고) 다음 녹음으로 넘어가면 문장·대본 카드로 내려가 바로 이어 읽게 한다 (2026-11-15 사용자 요청)
+  $effect(() => {
+    const kind = phase.kind
+    const from = previousPhase
+    previousPhase = kind
+    if (from === 'listening' && (kind === 'countdown' || kind === 'recording')) {
+      void tick().then(() => untrack(() => scrollToTop(scrollBox.querySelector<HTMLElement>('[data-reading]'))))
+    }
+  })
+
   function revealSummary() {
+    scrollToTop(summaryBox)
+  }
+
+  /** 아래 영역을 올리거나 내려 `element`의 위쪽이 영역 맨 위(8px 아래)에 오게 한다 */
+  function scrollToTop(element: HTMLElement | null) {
     // 다른 탭에 가려져 있으면(높이가 없으면) 그대로 둔다
-    if (summaryBox === null || scrollBox.offsetParent === null) return
-    const top = scrollBox.scrollTop + summaryBox.getBoundingClientRect().top - scrollBox.getBoundingClientRect().top - 8
+    if (element === null || scrollBox.offsetParent === null) return
+    const top = scrollBox.scrollTop + element.getBoundingClientRect().top - scrollBox.getBoundingClientRect().top - 8
     const reduceMotion = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
     scrollBox.scrollTo({ top: Math.max(0, top), behavior: reduceMotion ? 'auto' : 'smooth' })
   }
