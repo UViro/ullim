@@ -14,12 +14,14 @@
    * "AI에게 피드백 받기"는 요약(원하면 녹음 파일도)을 브라우저 공유 창에 넘기고, 보낼 앱은 사용자가 고른다.
    * "파일로 저장"은 녹음을 WAV로 이 기기에 내려받는다. "기록에 남기기"는 소리와 요약·메모를 내 기록 폴더(또는 기록 파일)에 남긴다.
    * 앱 자체는 인터넷으로 아무것도 보내지 않는다. 숫자 아래에는 구절별 문장 끝 요약(`PhraseEndingList`)을 둔다.
+   * 새로 녹음하는 동안(`recording`)에는 ‘지난 녹음’으로 흐리게 두고 버튼을 잠근다. 카드 높이는 그대로라 아래 대본이 움직이지 않는다.
    */
   let {
     take,
     summary,
     phraseEndings,
-  }: { take: RecordedTake; summary: PitchSummary; phraseEndings: PhraseEndingAnalysis } = $props()
+    recording = false,
+  }: { take: RecordedTake; summary: PitchSummary; phraseEndings: PhraseEndingAnalysis; recording?: boolean } = $props()
 
   let isShareMenuOpen = $state(false)
   let shareMenu: HTMLDivElement
@@ -89,9 +91,9 @@
   }
 </script>
 
-<section class="card" aria-label="마지막 녹음 요약">
+<section class="card" class:past={recording} aria-label={recording ? '지난 녹음 요약' : '마지막 녹음 요약'}>
   <div class="header">
-    <span class="title">{take.title}</span>
+    <span class="title">{recording ? '지난 녹음' : take.title}</span>
     <span class="duration">{PitchSummary.durationLabel(summary.duration)}</span>
   </div>
 
@@ -107,25 +109,30 @@
   <PhraseEndingList analysis={phraseEndings} takeStart={take.startTime} />
 
   <div class="actions">
-    <button class="record" onclick={askMemo} disabled={session.isLastTakeSaved || session.savingTake}>
+    <button class="record" onclick={askMemo} disabled={recording || session.isLastTakeSaved || session.savingTake}>
       {session.savingTake ? '남기는 중…' : isPending ? '✓ 기록에 담았어요' : session.isLastTakeSaved ? '✓ 기록에 남겼어요' : '🗂 기록에 남기기'}
     </button>
-    <button onclick={saveWav}>⤓ 파일로 저장</button>
+    <button onclick={saveWav} disabled={recording}>⤓ 파일로 저장</button>
   </div>
 
   <div class="actions">
     <div class="menu" bind:this={shareMenu}>
-      <button class="share" onclick={() => (isShareMenuOpen = !isShareMenuOpen)} aria-expanded={isShareMenuOpen}>
+      <button
+        class="share"
+        onclick={() => (isShareMenuOpen = !isShareMenuOpen)}
+        aria-expanded={isShareMenuOpen && !recording}
+        disabled={recording}
+      >
         ⇪ AI에게 피드백 받기
       </button>
-      {#if isShareMenuOpen}
+      {#if isShareMenuOpen && !recording}
         <div class="menu-items" role="menu">
           <button role="menuitem" onclick={() => share(false)}>요약 글만 보내기</button>
           <button role="menuitem" onclick={() => share(true)}>녹음 파일과 함께 보내기</button>
         </div>
       {/if}
     </div>
-    <button onclick={copy}>{didCopy ? '✓ 복사했어요' : '요약 복사'}</button>
+    <button onclick={copy} disabled={recording}>{didCopy ? '✓ 복사했어요' : '요약 복사'}</button>
   </div>
 
   {#if message !== null}
@@ -179,6 +186,10 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
+  }
+  /* 새로 녹음하는 동안의 지난 녹음: 흐리게만 한다 (높이가 바뀌면 아래 대본이 움직인다) */
+  .card.past {
+    opacity: 0.55;
   }
   .header {
     display: flex;

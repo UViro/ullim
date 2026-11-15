@@ -200,6 +200,7 @@ Voice Tools 앱에서 영감을 받았지만, 한국어 화자 기준(모음별 
   - 반복 루프(W4): 마이크는 루프 동안 켜 두고, 분석 스레드가 ‘begin’~‘finish’ 사이의 조각만 분석·녹음 통에 남긴다 (듣는 동안 스피커 소리가 섞이지 않게). 녹음 묶음 = 분석 스레드가 돌려준 소리 + 화면이 받은 점 중 그 구간. 단계는 `practice/loop.ts`, 흐름은 `practice/session.svelte.ts`
   - 개발 서버에서 주소 끝에 `?mute`를 붙이면 다시 듣기를 소리 없이 재생한다 (테스트 음이 스피커로 나가지 않게)
   - 화면 버튼은 Svelte가 이벤트를 위로 모아 받는다(delegation). 시험 삼아 `dispatchEvent`로 보낼 때는 `{ bubbles: true }`를 줘야 반응한다
+  - 화면 흔들림(2026-11-15): [높이]의 요약 카드는 녹음하는 동안에도 ‘지난 녹음’으로 흐리게 남긴다(버튼만 잠금, 높이는 그대로) — 숨기면 녹음을 시작·끝낼 때마다 아래 문장 카드·대본이 카드 높이만큼 튄다. 지금 높이 숫자 칸은 세 자리 폭(`min-width: 3ch`)을 잡아 둔다. 화면이 움직이는지는 미리보기 브라우저에서 `PerformanceObserver({ type: 'layout-shift' })`로 테스트 음 한 바퀴를 돌며 잰다
   - 탭(W5): 화면 셋은 `App.svelte`에서 숨기기만 한다(문장 카드 위치·스크롤 유지). 숨은 화면의 그림은 쉬게 `active`를 넘긴다. 녹음·듣기 조작(`PracticeControls`)과 연습 흐름(`session`)은 [높이]·[모음]이 하나를 같이 쓴다. 재기는 기준 목소리(10초)·모음(3초) 둘 다 `session`의 재기 단계이고 `measuringVowel`로 가른다
   - [모음] 확인: 개발 서버의 ‘테스트 모음으로 재기 (개발용)’는 배음 크기를 공명 모양(500·1500·2500·3500 Hz)으로 바꾼 합성음이다. 모음마다 다른 소리로 보려면 페이지에서 `await import('/test/signals.ts')`의 `SyntheticVowel.make`로 WAV를 만들어(`/src/audio/wav.ts`의 `encodeWav`) 파일 고르기에 넣는다. 같은 주소로 `import`한 모듈은 화면과 같은 것이라 `session`을 직접 부를 수도 있다
   - 휴대폰용 `dev:lan`(5173)이 켜져 있을 때 Claude의 미리보기 브라우저는 그 임시 인증서를 막는다 → `.claude/launch.json`의 `web-check`(http, 5174, 이 컴퓨터만)를 같이 켜서 본다

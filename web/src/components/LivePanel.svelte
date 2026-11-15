@@ -242,6 +242,9 @@
     font-variant-numeric: tabular-nums;
     font-size: 56px;
     line-height: 1.05;
+    /* 세 자리 숫자 폭을 미리 잡아 둔다 (분석 범위 70~400 Hz). ‘–’·두 자리·세 자리를 오가도 Hz와 옆 글이 움직이지 않게 (2026-11-15) */
+    min-width: 3ch;
+    text-align: right;
   }
   .compact .value {
     font-size: 28px;
