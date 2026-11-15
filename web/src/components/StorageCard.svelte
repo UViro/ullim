@@ -4,7 +4,7 @@
 
   /**
    * [기록] 탭의 ‘내 기록 저장 위치’: 기록 폴더 고르기·다시 연결·바꾸기·끊기, 기록 파일(zip)로 저장·불러오기.
-   * 기록은 이 웹사이트가 아니라 내가 고른 폴더나 내가 저장한 파일에 남는다 (W6, 사용자 결정).
+   * 기록은 이 웹사이트(서버)가 아니라 이 기기 안에 남는다: 고른 폴더, 아니면 이 기기의 브라우저 저장소(2026-11-15~), 그리고 내가 저장한 파일.
    */
   let fileInput: HTMLInputElement
 
@@ -24,7 +24,9 @@
     // 지금 값이 파일의 것으로 바뀌므로, 잃을 것이 있으면 먼저 묻는다
     const question =
       status.kind === 'connected'
-        ? `‘${status.folderName}’ 폴더의 ‘울림-설정.json’과 ‘울림-기록.json’이 ‘${file.name}’의 내용으로 바뀌어요. 계속할까요?`
+        ? store.inBrowser
+          ? `이 기기의 브라우저에 저장된 목표 범위·기준·모음 지도와 기록이 ‘${file.name}’의 내용으로 바뀌어요. 계속할까요?`
+          : `‘${status.folderName}’ 폴더의 ‘울림-설정.json’과 ‘울림-기록.json’이 ‘${file.name}’의 내용으로 바뀌어요. 계속할까요?`
         : store.unsaved
           ? `아직 저장하지 않은 바뀐 내용은 사라지고 ‘${file.name}’의 기록으로 바뀌어요. 계속할까요?`
           : null
@@ -38,7 +40,7 @@
   <p class="secondary">
     {store.isApp
       ? '목표 범위·내 기준 목소리·내 모음 지도와 연습 기록은 휴대폰의 ‘문서/울림’ 폴더에 파일로 남아요. 울림은 기록을 어디로도 보내지 않아요.'
-      : '목표 범위·내 기준 목소리·내 모음 지도와 연습 기록은 이 웹사이트가 아니라 내가 고른 곳에 파일로 남아요. 울림은 기록을 어디로도 보내지 않아요.'}
+      : '목표 범위·내 기준 목소리·내 모음 지도와 연습 기록은 이 웹사이트(서버)가 아니라 이 기기 안에 남아요. 울림은 기록을 어디로도 보내지 않아요.'}
   </p>
 
   {#if store.isApp}
@@ -63,6 +65,26 @@
       <div class="buttons">
         <button class="fill" onclick={() => store.connectAppFolder()} disabled={store.busy}>📁 다시 열기</button>
       </div>
+    {/if}
+  {:else if status.kind === 'connected' && store.inBrowser}
+    <!-- 고른 폴더가 없을 때: 이 기기의 브라우저 저장소 (2026-11-15) -->
+    <p class="state ok">✓ 이 기기의 브라우저 안에 저장하고 있어요</p>
+    {#if savedTime !== null}
+      <p class="secondary small">마지막 저장 {savedTime}</p>
+    {/if}
+    <p class="secondary small">
+      새로고침하거나 브라우저를 닫아도 남아요. 다만 브라우저 설정에서 방문 기록·사이트 데이터를 지우면 함께 지워지고, 다른 기기나 다른
+      브라우저에서는 보이지 않아요. 가끔 ‘기록 파일로 저장’으로 백업해 두세요.
+    </p>
+    <p class="secondary small">
+      아이폰 사파리는 7일 넘게 이 사이트를 열지 않으면 저장한 기록을 지울 수 있어요. 공유 버튼 → ‘홈 화면에 추가’로 만든 아이콘으로 열어
+      쓰면 더 안전해요. 홈 화면 아이콘과 사파리에서는 기록이 따로 보일 수 있으니, 한쪽으로만 쓰는 것을 권해요.
+    </p>
+    {#if store.canPickFolder}
+      <div class="buttons">
+        <button onclick={() => store.chooseFolder()} disabled={store.busy}>📁 폴더에 저장하기</button>
+      </div>
+      <p class="secondary small">폴더를 고르면 지금까지의 기록을 그 폴더로 옮겨 파일로 남겨요.</p>
     {/if}
   {:else if status.kind === 'connected'}
     <p class="state ok">✓ ‘{status.folderName}’ 폴더에 저장하고 있어요</p>
@@ -92,10 +114,10 @@
       <button class="fill" onclick={() => store.chooseFolder()} disabled={store.busy}>📁 기록 폴더 고르기</button>
     </div>
   {:else}
-    <p class="state">이 브라우저는 폴더에 바로 저장하지 못해요</p>
+    <p class="state">이 브라우저는 기록을 저장해 두지 못해요</p>
     <p class="secondary small">
-      기록을 파일 하나(‘울림-기록-날짜.zip’)로 저장해 두고, 다음에 열 때 ‘기록 파일 불러오기’로 이어서 써요. 아이폰은 보통 ‘파일’
-      앱의 ‘다운로드’ 폴더에 저장돼요.
+      사생활 보호 모드 등으로 이 브라우저 안에 저장할 수 없어서, 새로고침하면 기록이 사라져요. 기록을 파일 하나(‘울림-기록-날짜.zip’)로
+      저장해 두고, 다음에 열 때 ‘기록 파일 불러오기’로 이어서 써요. 아이폰은 보통 ‘파일’ 앱의 ‘다운로드’ 폴더에 저장돼요.
     </p>
   {/if}
 

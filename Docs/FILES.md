@@ -164,6 +164,7 @@
 | `web/src/storage/recordFolder.ts` | 기록 폴더 하나의 읽기·쓰기·지우기·목록: 내가 고른 폴더(파일 시스템 접근 API), 메모리 폴더(사파리·테스트) |
 | `web/src/storage/recordZip.ts` | 기록 파일(zip, fflate): 묶기(내 대본 파일도), 풀기(울림 파일만, 폴더째 압축·맥 한글 이름·크기 제한) |
 | `web/src/storage/handleStore.ts` | 고른 기록 폴더의 연결 정보를 이 브라우저(IndexedDB)에 기억 |
+| `web/src/storage/browserFolder.ts` | 이 기기의 브라우저 저장소(IndexedDB `ullim-records`)에 두는 기록 폴더 (2026-11-15). 고른 폴더가 없을 때(스마트폰 브라우저) 저절로 쓰여 새로고침해도 기록이 남는다. 저장소 오래 두기 부탁(`persist`) |
 | `web/src/storage/fileSystemAccess.d.ts` | TypeScript 기본 타입에 아직 없는 폴더 고르기·허락 묻기 타입 |
 | `web/src/components/HistoryScreen.svelte` | [기록] 화면: 기간·언어 거르기, 모아 보기, 그래프, 남긴 녹음·연습 기록·내 목소리 재기 목록, 모두 지우기, 저장 위치(필요할 때는 맨 위). 누르면 자세히 화면으로 바뀐다(돌아오면 스크롤 그대로) |
 | `web/src/components/HistoryCharts.svelte`, `LanguageTag.svelte` | [기록] 그래프 세 개(연습마다 높이: 반음 눈금·목표 띠·기준 점선·언어별 점 모양 / 연습마다 공명 밝기 F2, ‘읽은 대본’을 고르면 그 대본을 읽은 녹음마다 / 날마다 연습 시간 막대, SVG)와 언어 표시 |
@@ -201,4 +202,5 @@
 | `web/test/golden/swift-golden.json` | `Tools/WebGolden`이 만든 정답표. 손으로 고치지 않는다 |
 | `web/test/phraseEnding.test.ts` | 구절별 문장 끝 분석의 시험지 (iOS `PhraseEndingAnalysisTests`와 같은 입력·기대값 파일을 읽는다) |
 | `web/test/takeScript.test.ts` | 녹음마다 읽은 대본 시험지 (iOS `TakeScriptTests`와 같은 경우·같은 글 + 웹만: 마이크 켜기 전 다른 시계로 적은 대본) |
+| `web/test/browserFolder.test.ts` | 브라우저 저장소 시험지: 읽기·쓰기(소리 형식까지)·목록·지우기, 새로고침해도 설정·기록이 남는지, 폴더로 옮기기·기록 파일로 묶기 (IndexedDB 대신 같은 모양의 Map) |
 | `web/test/phraseRecords.test.ts` | 기록에 남긴 문장 끝 숫자: 연습 기록·남긴 녹음 저장·되읽기, 예전 기록·망가진 칸, 녹음 여러 개 합치기, 연습 기록 요청문 (iOS `PhraseEndingRecordTests`와 같은 숫자·같은 글) |

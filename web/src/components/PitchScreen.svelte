@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onMount, tick, untrack } from 'svelte'
   import { analyzePhraseEndings } from '../dsp/phraseEnding'
   import { graphHeight } from '../graph/pitchGraph'
   import { PRACTICE_LANGUAGES, type PracticeLanguage } from '../model/records'
@@ -51,6 +51,27 @@
     }
   })
 
+  let scrollBox: HTMLDivElement
+  let summaryBox: HTMLDivElement | null = $state(null)
+  /** 마지막으로 올려 보인 녹음 (같은 녹음으로 두 번 올리지 않게) */
+  let revealedTakeId: number | null = null
+
+  // 녹음이 끝나 새 요약이 생기면(지금 들어보기·정지·파일 불러오기) 아래 화면을 올려 요약 카드를 보인다 (2026-11-15 사용자 요청)
+  $effect(() => {
+    const id = session.lastTake?.id ?? null
+    if (id === null || id === revealedTakeId) return
+    revealedTakeId = id
+    void tick().then(() => untrack(revealSummary))
+  })
+
+  function revealSummary() {
+    // 다른 탭에 가려져 있으면(높이가 없으면) 그대로 둔다
+    if (summaryBox === null || scrollBox.offsetParent === null) return
+    const top = scrollBox.scrollTop + summaryBox.getBoundingClientRect().top - scrollBox.getBoundingClientRect().top - 8
+    const reduceMotion = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
+    scrollBox.scrollTo({ top: Math.max(0, top), behavior: reduceMotion ? 'auto' : 'smooth' })
+  }
+
   onMount(() => {
     // 처음 열 때 한 번: 기준 목소리를 아직 안 쟀으면 재기 화면을 띄운다 ("나중에"로 건너뛸 수 있음).
     if (settings.baseline === null && !settings.baselinePromptShown) {
@@ -66,11 +87,13 @@
       <LivePanel {compact} {height} {caption} />
     </div>
 
-    <div class="scroll">
+    <div class="scroll" bind:this={scrollBox}>
       <StorageNotice />
       <TargetRangeControls canMeasure={!session.isRunning} onMeasure={() => (navigation.baselineSheetOpen = true)} />
       {#if session.lastTake !== null && summary !== null && phraseEndings !== null}
-        <SummaryCard take={session.lastTake} {summary} {phraseEndings} recording={phase.kind === 'recording'} />
+        <div bind:this={summaryBox}>
+          <SummaryCard take={session.lastTake} {summary} {phraseEndings} recording={phase.kind === 'recording'} />
+        </div>
       {/if}
       <SentenceCards isPracticing={session.isRunning} />
       <!-- 말하는 언어는 문장 아래에 둔다. 기록에 함께 남아 나중에 언어별로 높이를 비교한다. 연습 중에는 바꾸지 않는다 -->

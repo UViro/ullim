@@ -24,6 +24,7 @@ import {
   type RecordList,
   type RecordsData,
 } from './archive'
+import { BrowserFolder, requestPersistentStorage } from './browserFolder'
 import { loadFolderHandle, saveFolderHandle } from './handleStore'
 import { browserStorage, loadAppRecordRoot, saveValue, SettingKeys } from '../model/settingsStorage'
 import {
@@ -44,12 +45,14 @@ import { packRecordFolder, recordFileName, unpackRecordFile } from './recordZip'
 export type AddResult = 'saved' | 'pending' | 'failed'
 
 /**
- * 내 기록이 어디에 남는지: 브라우저가 아니라 내가 고른 폴더, 또는 내가 저장하는 기록 파일 (W6, 사용자 결정).
+ * 내 기록이 어디에 남는지: 내가 고른 폴더, 아니면 이 기기의 브라우저 안 저장소(IndexedDB), 그리고 내가 저장하는 기록 파일.
+ * 처음(W6, 2026-10-25)에는 고른 폴더와 기록 파일뿐이었는데, 폴더를 고를 수 없는 스마트폰 브라우저에서 새로고침하면 기록이 사라져서
+ * 2026-11-15에 브라우저 안 저장소를 더했다(사용자 요청: 폰마다 기록이 남게). 어디에 두든 기록은 그 기기를 떠나지 않는다.
  * 안드로이드 앱은 폴더를 고르지 않고 휴대폰의 ‘문서/울림’에 바로 쓴다 (A2, 사용자 결정).
- * - none: 폴더를 고를 수 있는 브라우저인데 아직 고르지 않음 (바꾼 값은 페이지를 닫으면 사라진다). 앱은 ‘문서/울림’을 열기 전이나 열지 못했을 때
+ * - none: 폴더를 고를 수 있는 브라우저인데 아직 고르지 않았고 브라우저 저장소도 열지 못함. 앱은 ‘문서/울림’을 열기 전이나 열지 못했을 때
  * - needsPermission: 전에 고른 폴더가 있지만 브라우저가 다시 허락을 받으라고 함 (버튼을 눌러야 물을 수 있다)
- * - connected: 고른 폴더에 바로 쓰는 중
- * - memory: 폴더를 고를 수 없는 브라우저(사파리·Firefox). 기록 파일(zip)로 저장하고 다음에 불러온다
+ * - connected: 고른 폴더나 브라우저 저장소(`inBrowser`)에 바로 쓰는 중
+ * - memory: 폴더를 고를 수 없고 브라우저 저장소도 쓸 수 없음(사생활 보호 모드 등). 기록 파일(zip)로 저장하고 다음에 불러온다
  */
 export type StorageStatus =
   | { readonly kind: 'none' }
@@ -72,8 +75,12 @@ function isPermissionError(error: unknown): boolean {
 class RecordStore {
   /** 안드로이드 앱 안인지. 앱은 폴더를 고르지 않고 ‘문서/울림’에 바로 쓴다 */
   readonly isApp: boolean
-  /** 이 브라우저가 폴더를 고를 수 있는지 (개발 서버에서 주소 끝에 `?nofolder`를 붙이면 사파리처럼 동작한다) */
+  /** 이 브라우저가 폴더를 고를 수 있는지 (개발 서버에서 주소 끝에 `?nofolder`를 붙이면 아이폰 사파리처럼 동작한다) */
   readonly canPickFolder: boolean
+  /** 고른 폴더가 없을 때 이 기기의 브라우저 저장소에 둘 수 있는지 (개발 서버의 `?seed`·`?nostore`는 화면에만 둔다) */
+  readonly canUseBrowserStorage: boolean
+  /** 브라우저가 이 사이트의 저장소를 함부로 지우지 않기로 했는지 (모르면 null) */
+  persisted: boolean | null = $state(null)
   status: StorageStatus = $state({ kind: 'none' })
   /** 폴더를 열거나 기록 파일을 만드는 중 */
   busy = $state(false)
@@ -105,6 +112,11 @@ class RecordStore {
   #handle: FileSystemDirectoryHandle | null = null
   /** 연결된 기록 폴더 (connected일 때만) */
   #folder: RecordFolder | null = null
+
+  /** 고른 폴더가 아니라 이 기기의 브라우저 저장소에 쓰는 중인지 */
+  get inBrowser(): boolean {
+    return this.#folder instanceof BrowserFolder
+  }
   /** 기록 폴더가 없을 때 남긴 녹음 소리를 들고 있는 곳 (폴더를 고르면 옮기고, 기록 파일로 저장할 때 함께 묶는다) */
   #memory = new MemoryFolder()
   /** 기록 폴더에 아직 쓰지 않은 기록이 있는지 */
@@ -119,8 +131,12 @@ class RecordStore {
   #started = false
 
   constructor() {
-    const forceMemory = import.meta.env.DEV && new URLSearchParams(globalThis.location?.search).has('nofolder')
+    const query = new URLSearchParams(globalThis.location?.search)
+    const forceMemory = import.meta.env.DEV && query.has('nofolder')
     this.isApp = isNativeApp()
+    // 개발 서버의 가짜 기록(`?seed`)은 화면에만 넣는다 (브라우저 저장소에 섞이지 않게)
+    this.canUseBrowserStorage =
+      !this.isApp && typeof globalThis.indexedDB !== 'undefined' && !(import.meta.env.DEV && (query.has('seed') || query.has('nostore')))
     // 앱의 웹뷰에도 폴더 고르기 함수는 있지만, 부르면 창 없이 바로 취소된다 (A1 확인)
     this.canPickFolder =
       !this.isApp &&
@@ -148,13 +164,26 @@ class RecordStore {
       await this.connectAppFolder()
       return
     }
-    if (!this.canPickFolder) return
-    const handle = await loadFolderHandle()
-    if (handle === null) return
+    const handle = this.canPickFolder ? await loadFolderHandle() : null
+    if (handle === null) {
+      // 고른 폴더가 없으면 이 기기의 브라우저 저장소에 둔다 (스마트폰 브라우저는 폴더를 고를 수 없다)
+      await this.#connectBrowserStorage()
+      return
+    }
     this.#handle = handle
     const permission = (await handle.queryPermission?.({ mode: 'readwrite' })) ?? 'granted'
     if (permission === 'granted') await this.#connect(handle)
     else this.status = { kind: 'needsPermission', folderName: handle.name }
+  }
+
+  /** 이 기기의 브라우저 저장소를 기록 폴더로 연다. 열지 못하면(사생활 보호 모드 등) 지금처럼 화면에만 두고 기록 파일로 저장한다 */
+  async #connectBrowserStorage(): Promise<void> {
+    if (!this.canUseBrowserStorage) return
+    if ((await this.#connectFolder(new BrowserFolder(), null)) !== 'connected') {
+      this.errorMessage = '이 브라우저 안에 기록을 저장할 수 없어요(사생활 보호 모드 등). 기록 파일로 저장해 두세요.'
+      return
+    }
+    this.persisted = await requestPersistentStorage()
   }
 
   // MARK: - 기록 폴더
@@ -221,8 +250,9 @@ class RecordStore {
     if (await this.#connect(handle)) await saveFolderHandle(handle)
   }
 
-  /** 이 브라우저에서 폴더 연결을 끊는다 (폴더의 파일은 그대로 둔다) */
+  /** 이 브라우저에서 폴더 연결을 끊는다 (폴더의 파일은 그대로 둔다). 브라우저 저장소는 끊지 않는다 */
   async disconnect(): Promise<void> {
+    if (this.inBrowser) return
     await this.#flush()
     this.#folder = null
     this.#handle = null
@@ -254,8 +284,10 @@ class RecordStore {
         this.errorMessage = result.message
         return 'unreadable'
       }
-      // 폴더를 고르기 전에 담아 둔 녹음 소리도 폴더로 옮긴다 (기록은 위에서 합쳤다)
+      // 폴더를 고르기 전에 담아 둔 녹음 소리도 폴더로 옮긴다 (기록은 위에서 합쳤다).
+      // 브라우저 저장소에 두다가 폴더를 고르면 그 녹음도 옮긴다 (브라우저 저장소의 파일은 지우지 않고 그대로 둔다)
       await copyRecordings(this.#memory, folder)
+      if (this.#folder instanceof BrowserFolder && !(folder instanceof BrowserFolder)) await copyRecordings(this.#folder, folder)
       this.#memory = new MemoryFolder()
       this.#handle = handle
       this.#folder = folder
