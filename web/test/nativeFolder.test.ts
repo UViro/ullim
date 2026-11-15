@@ -135,7 +135,9 @@ describe('NativeFolder (휴대폰의 ‘문서/울림’)', () => {
     expect(fs.appends).toBe(2)
     const read = await folder.read('녹음/Ullim-20261026-2130.wav')
     expect(new Uint8Array(await read!.arrayBuffer())).toEqual(wav)
-  })
+    // 1.5 MB 남짓을 base64로 바꿔 쓰고 읽느라, 이 컴퓨터에서는 1초 남짓이지만 GitHub Actions에서는 5초(기본 제한)를
+    // 넘긴 적이 있다(2026-11-15, 5.26초로 배포 실패). 이 시험만 제한을 넉넉히 둔다
+  }, 30_000)
 
   it('같은 파일을 다시 쓰면 그 자리에 덮어쓴다: 지우거나 임시 파일을 만들지 않는다 (공용 폴더의 미디어 목록이 어긋나지 않게)', async () => {
     const fs = new FakeFilesystem()
