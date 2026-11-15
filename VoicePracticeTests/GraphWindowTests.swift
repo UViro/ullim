@@ -143,4 +143,29 @@ struct GraphWindowTests {
         let short = history.displaySegments(in: GraphWindow(start: 0, duration: 10), until: 10, width: 300)
         #expect(short.flatMap { $0 }.count == history.readings(in: -0.5...10).filter { $0.frequency != nil }.count)
     }
+
+    @Test("녹음 중 흐르는 그래프: 지나간 칸의 점은 그릴 때마다 같다 (칸 경계를 시각에 고정, 2026-11-15)")
+    func displaySegmentsStayStillWhileScrolling() {
+        // 70초 동안 말소리처럼 오르내리는 높이. 아이폰 폭(343pt × 3배 화소)에 60초 가로축이면 한 칸이 약 58 ms
+        var history = PitchHistory(retention: 200)
+        history.append(contentsOf: stride(from: 0.0, to: 70, by: 0.0213).map { time in
+            PitchReading(time: time, frequency: 200 + 40 * sin(time * 2.1) + 15 * sin(time * 7.3) + 6 * sin(time * 23))
+        })
+        func pastPoints(at now: Double) -> [Double: Double] {
+            let window = GraphWindow.live(recordingStart: 0, now: now, duration: 60)
+            let points = history.displaySegments(in: window, until: now, width: 343 * 3).flatMap { $0 }
+            // 왼쪽 끝 가까이와 맨 끝(아직 점이 들어오는 칸)은 빼고 본다
+            return Dictionary(uniqueKeysWithValues: points
+                .filter { $0.time > window.start + 1 && $0.time < now - 1 }
+                .map { ($0.time, $0.frequency ?? 0) })
+        }
+        let first = pastPoints(at: 65)
+        #expect(first.count > 500)
+        for frame in 1..<12 {  // 초당 60번 그리는 동안
+            let later = pastPoints(at: 65 + Double(frame) / 60)
+            let shared = first.keys.filter { later[$0] != nil }
+            #expect(shared.count > 500, "\(frame)번째: 같은 자리의 점이 없다 (칸이 그래프 왼쪽 끝을 따라 움직였다)")
+            #expect(shared.allSatisfy { first[$0] == later[$0] }, "\(frame)번째: 지나간 선의 높이가 바뀌었다")
+        }
+    }
 }

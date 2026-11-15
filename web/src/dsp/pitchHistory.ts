@@ -71,6 +71,8 @@ export class PitchHistory {
    * 그래프에 그릴 유성 구간들 (`window` 안, `end` 시각까지). `width`: 그래프 가로 폭의 픽셀 수.
    * 가로축이 길어 한 픽셀 열에 점이 두 개 넘게 몰리면, 열마다 한 점(그 열의 목소리 높이 평균)으로 묶는다.
    * 묶은 칸 사이에 목소리 없는 칸이 끼면 선을 끊는다.
+   * 칸의 경계는 그래프 왼쪽 끝이 아니라 시각 0초에 맞춘다. 녹음 중에는 왼쪽 끝이 그릴 때마다 조금씩 흘러가서,
+   * 왼쪽 끝에 맞추면 같은 점들이 매번 다른 칸으로 묶여 지나간 선까지 위아래로 떨렸다 (2026-11-15).
    */
   displaySegments(window: GraphWindow, end: number, width: number): PitchReading[][] {
     // 흐르는 그래프의 왼쪽 끝에서 선이 끊겨 보이지 않게 조금 앞부터 그린다 (그래프 밖은 잘라 낸다).
@@ -87,7 +89,7 @@ export class PitchHistory {
     let count = 0
     const closeBucket = () => {
       if (bucketIndex === null || count === 0) return
-      const point: PitchReading = { time: window.start + (bucketIndex + 0.5) * bucket, frequency: sum / count }
+      const point: PitchReading = { time: (bucketIndex + 0.5) * bucket, frequency: sum / count }
       const last = current[current.length - 1]
       if (last !== undefined && point.time - last.time > bucket * 1.5) {
         segments.push(current)
@@ -97,7 +99,7 @@ export class PitchHistory {
     }
     for (const reading of this.readingsIn(span)) {
       if (reading.frequency === null) continue
-      const index = Math.floor((reading.time - window.start) / bucket)
+      const index = Math.floor(reading.time / bucket)
       if (index !== bucketIndex) {
         closeBucket()
         bucketIndex = index

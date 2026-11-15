@@ -69,6 +69,8 @@ struct PitchHistory {
     /// 가로축이 길어 한 픽셀 열에 점이 두 개 넘게 몰리면, 열마다 한 점(그 열의 목소리 높이 평균)으로 묶는다.
     /// 3분이면 점이 8천 개가 넘는데 화면은 1천 픽셀 남짓이라, 다 그리면 느리기만 하고 보이는 모양은 같다.
     /// 묶은 칸 사이에 목소리 없는 칸이 끼면 선을 끊는다.
+    /// 칸의 경계는 그래프 왼쪽 끝이 아니라 시각 0초에 맞춘다. 녹음 중에는 왼쪽 끝이 그릴 때마다 조금씩 흘러가서,
+    /// 왼쪽 끝에 맞추면 같은 점들이 매번 다른 칸으로 묶여 지나간 선까지 위아래로 떨렸다 (2026-11-15).
     func displaySegments(in window: GraphWindow, until end: TimeInterval, width: Double) -> [[PitchReading]] {
         // 흐르는 그래프의 왼쪽 끝에서 선이 끊겨 보이지 않게 조금 앞부터 그린다 (그래프 밖은 잘라 낸다).
         let range = (window.start - 0.5)...max(window.start - 0.5, min(end, window.end))
@@ -84,7 +86,7 @@ struct PitchHistory {
         var count = 0
         func closeBucket() {
             guard let bucketIndex, count > 0 else { return }
-            let point = PitchReading(time: window.start + (Double(bucketIndex) + 0.5) * bucket,
+            let point = PitchReading(time: (Double(bucketIndex) + 0.5) * bucket,
                                      frequency: sum / Double(count))
             if let last = current.last, point.time - last.time > bucket * 1.5 {
                 segments.append(current)
@@ -94,7 +96,7 @@ struct PitchHistory {
         }
         for reading in readings(in: range) {
             guard let frequency = reading.frequency else { continue }
-            let index = Int(((reading.time - window.start) / bucket).rounded(.down))
+            let index = Int((reading.time / bucket).rounded(.down))
             if index != bucketIndex {
                 closeBucket()
                 bucketIndex = index

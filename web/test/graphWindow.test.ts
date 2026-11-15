@@ -112,6 +112,32 @@ describe('GraphWindow (가로축)', () => {
     const short = history.displaySegments(new GraphWindow(0, 10), 10, 300)
     expect(short.flat().length).toBe(history.readingsIn(range(-0.5, 10)).filter((r) => r.frequency !== null).length)
   })
+
+  it('녹음 중 흐르는 그래프: 지나간 칸의 점은 그릴 때마다 같다 (칸 경계를 시각에 고정, 2026-11-15)', () => {
+    // 70초 동안 말소리처럼 오르내리는 높이. 아이폰 폭(343pt × 3배 화소)에 60초 가로축이면 한 칸이 약 58 ms
+    const history = new PitchHistory(200)
+    const readings = []
+    for (let index = 0; index * 0.0213 < 70; index++) {
+      const time = index * 0.0213
+      readings.push({ time, frequency: 200 + 40 * Math.sin(time * 2.1) + 15 * Math.sin(time * 7.3) + 6 * Math.sin(time * 23) })
+    }
+    history.append(readings)
+    const pastPoints = (now: number) => {
+      const window = GraphWindow.live(0, now, 60)
+      // 왼쪽 끝 가까이와 맨 끝(아직 점이 들어오는 칸)은 빼고 본다
+      const points = history.displaySegments(window, now, 343 * 3).flat().filter((p) => p.time > window.start + 1 && p.time < now - 1)
+      return new Map(points.map((p) => [p.time, p.frequency]))
+    }
+    const first = pastPoints(65)
+    expect(first.size).toBeGreaterThan(500)
+    for (let frame = 1; frame < 12; frame++) {
+      // 초당 60번 그리는 동안
+      const later = pastPoints(65 + frame / 60)
+      const shared = [...first.keys()].filter((time) => later.has(time))
+      expect(shared.length, `${frame}번째: 같은 자리의 점이 없다 (칸이 그래프 왼쪽 끝을 따라 움직였다)`).toBeGreaterThan(500)
+      expect(shared.every((time) => first.get(time) === later.get(time)), `${frame}번째: 지나간 선의 높이가 바뀌었다`).toBe(true)
+    }
+  })
 })
 
 describe('GraphClock', () => {
